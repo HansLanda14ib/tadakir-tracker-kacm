@@ -358,9 +358,67 @@ export default function LandingTicketRealtime({
                 </div>
             </div>
 
-            <div className="max-w-6xl mx-auto px-6 py-10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Additional content can go here */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {/* Event Details Card */}
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
+                        <h3 className="font-semibold text-gray-900 mb-3 text-lg">Détails de l'événement</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Catégorie:</span>
+                                <span className="font-medium">{event.categorieEventNom}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Type:</span>
+                                <span className="font-medium">
+                                    {event.evenementTicketMode === 1 ? "Billetterie" : "Autre"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Prix minimum:</span>
+                                <span className="font-bold text-green-600">{event.evenementMinPrix} MAD</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats Card */}
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg">
+                        <h3 className="font-semibold text-gray-900 mb-3 text-lg">Statistiques</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Tickets restants:</span>
+                                <span className="font-bold text-2xl text-indigo-600">
+                                    {typeof remaining === "number" ? remaining.toLocaleString() : "--"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Synchronisation:</span>
+                                <span className={`font-medium px-2 py-1 rounded-full text-xs ${
+                                    connectedVia === 'websocket' ? 'bg-green-100 text-green-800' :
+                                        connectedVia === 'polling' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
+                                }`}>
+                                    {connectedVia === 'websocket' ? '🟢 WebSocket' :
+                                        connectedVia === 'polling' ? '🔄 Polling' : '⚫ Hors ligne'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Actions Card */}
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg sm:col-span-2 lg:col-span-1">
+                        <h3 className="font-semibold text-gray-900 mb-3 text-lg">Actions rapides</h3>
+                        <div className="space-y-3">
+                            <button
+                                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 text-sm">
+                                📱 Partager l'événement
+                            </button>
+                            <button
+                                className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200 text-sm">
+                                🔔 Recevoir des notifications
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
