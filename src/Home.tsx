@@ -1,6 +1,6 @@
 import {useEffect, useState, useRef} from "react";
 import {motion} from "framer-motion";
-import {Clock, Ticket} from "lucide-react";
+import {Clock} from "lucide-react";
 import {
     LineChart,
     Line,
@@ -9,6 +9,36 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
+
+// Type definitions
+interface Event {
+    evenementId: string | number;
+    evenementNomFr: string;
+    evenementImage: string;
+    evenementImageSlider?: string;
+    evenementDateEvent: string;
+    evenementMinPrix: number;
+    evenementTicketMode: number;
+    evenementQuota?: number;
+    quantity?: number;
+    categorieEventNom: string;
+    clubNomFr: string;
+    clubLogo: string;
+    clubVisitorNomFr: string;
+    clubVisitorLogo: string;
+}
+
+interface HistoryPoint {
+    t: string;
+    v: number;
+}
+
+interface Props {
+    clubSlug?: string;
+    pollingInterval?: number;
+    wsUrl?: string | null;
+    apiEndpoint?: string | null;
+}
 
 /**
  * LandingTicketRealtime
@@ -32,17 +62,18 @@ export default function LandingTicketRealtime({
                                                   pollingInterval = 10000, // ms
                                                   wsUrl = null, // ex: "wss://example.com/ws/tickets"
                                                   apiEndpoint = null, // optional custom API, default built from clubSlug
-                                              }) {
+                                              }: Props) {
     const apiUrl = apiEndpoint
         ? apiEndpoint
         : `https://tadakir.net/api/mobile/evenement?clubSlug=${clubSlug}`;
 
-    const [event, setEvent] = useState(null);
-    const [remaining, setRemaining] = useState(null);
-    const [history, setHistory] = useState([]); // for charting
-    const [connectedVia, setConnectedVia] = useState("none");
-    const wsRef = useRef(null);
-    const pollingRef = useRef(null);
+    const [event, setEvent] = useState<Event | null>(null);
+    const [remaining, setRemaining] = useState<number | null>(null);
+    const [history, setHistory] = useState<HistoryPoint[]>([]); // for charting
+    const [connectedVia, setConnectedVia] = useState<"none" | "websocket" | "polling">("none");
+    const wsRef = useRef<WebSocket | null>(null);
+    // @ts-ignore
+    const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
     // helper: fetch event data from api
     async function fetchEvent() {
@@ -51,20 +82,22 @@ export default function LandingTicketRealtime({
             if (!res.ok) throw new Error("fetch failed");
             const arr = await res.json();
             if (!Array.isArray(arr) || arr.length === 0) return;
-            const e = arr[0];
+            const e = arr[0] as Event;
             setEvent(e);
 
             // try to infer remaining tickets: use 'quantity' if present, else use 'evenementQuota'
             const rem = typeof e.quantity === "number" ? e.quantity : e.evenementQuota;
             setRemaining((prev) => (rem !== undefined ? rem : prev));
-            pushHistoryPoint(rem);
+            if (rem !== undefined) {
+                pushHistoryPoint(rem);
+            }
         } catch (err) {
             console.error("fetchEvent error", err);
         }
     }
 
     // keep a short history for the chart (max 30 points)
-    function pushHistoryPoint(value) {
+    function pushHistoryPoint(value: number) {
         if (typeof value !== "number") return;
         setHistory((h) => {
             const next = [...h, {t: new Date().toLocaleTimeString(), v: value}];
@@ -96,7 +129,7 @@ export default function LandingTicketRealtime({
                         setConnectedVia("websocket");
                     };
 
-                    wsRef.current.onmessage = (msg) => {
+                    wsRef.current.onmessage = (msg: MessageEvent) => {
                         try {
                             const d = JSON.parse(msg.data);
                             // Expect message shape: { evenementId: 153, remaining: 29300 }
@@ -117,9 +150,12 @@ export default function LandingTicketRealtime({
                         startPolling();
                     };
 
-                    wsRef.current.onerror = (e) => {
+                    // @ts-ignore
+                    wsRef.current.onerror = (e: Event) => {
                         console.error("WS error", e);
-                        wsRef.current && wsRef.current.close();
+                        if (wsRef.current) {
+                            wsRef.current.close();
+                        }
                     };
 
                     return; // don't start polling if ws in use
@@ -146,6 +182,7 @@ export default function LandingTicketRealtime({
                 try {
                     wsRef.current.close();
                 } catch (e) {
+                    // ignore cleanup errors
                 }
             }
             if (pollingRef.current) {
@@ -153,8 +190,7 @@ export default function LandingTicketRealtime({
                 pollingRef.current = null;
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [wsUrl, clubSlug, apiEndpoint, pollingInterval, event && event.evenementId]);
+    }, [wsUrl, clubSlug, apiEndpoint, pollingInterval, event?.evenementId]);
 
     // countdown timer (simple)
     const [now, setNow] = useState(Date.now());
@@ -163,7 +199,7 @@ export default function LandingTicketRealtime({
         return () => clearInterval(t);
     }, []);
 
-    function getCountdown(dateStr) {
+    function getCountdown(dateStr: string) {
         if (!dateStr) return "--";
         const target = new Date(dateStr).getTime();
         const diff = Math.max(0, target - now);
@@ -288,7 +324,7 @@ export default function LandingTicketRealtime({
                                         {/* If you had total capacity, compute percent; we'll approximate with a moving range */}
                                         <div
                                             className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-pink-500 transition-all"
-                                            style={{width: `${Math.min(100, (history.length ? (history[history.length - 1].v / (event.quantity || 1) * 100) : 50))}%`}}
+                                            style={{width: `${Math.min(100, (history.length ? (history[history.length - 1].v / (event.quantity || event.evenementQuota || 1) * 100) : 50))}%`}}
                                         />
                                     </div>
                                 </div>
@@ -306,6 +342,16 @@ export default function LandingTicketRealtime({
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
+
+                                {/* Optional: Add simulate purchase button for testing */}
+                                <div className="mt-4">
+                                    <button
+                                        onClick={() => simulatePurchase(1)}
+                                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                    >
+                                        Simuler achat (test)
+                                    </button>
+                                </div>
                             </motion.div>
                         </div>
                     </div>
@@ -314,6 +360,7 @@ export default function LandingTicketRealtime({
 
             <div className="max-w-6xl mx-auto px-6 py-10">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Additional content can go here */}
                 </div>
             </div>
         </div>
